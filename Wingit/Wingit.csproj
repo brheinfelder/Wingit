@@ -127,6 +127,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Airfoil.cs" />
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -135,7 +136,7 @@
     <Compile Include="SwAddin.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="InsertAifoilPMP.cs" />
+    <Compile Include="InsertAirfoilPMP.cs" />
     <EmbeddedResource Include="mainicon_20.png" />
     <EmbeddedResource Include="mainicon_32.png" />
     <EmbeddedResource Include="mainicon_40.png" />

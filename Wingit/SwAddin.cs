@@ -4,11 +4,13 @@ using SolidWorks.Interop.swpublished;
 using SolidWorksTools;
 using SolidWorksTools.File;
 using System;
+using System.Windows.Forms;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using WingIt;
 
 
 namespace Wingit
@@ -27,13 +29,15 @@ namespace Wingit
         #region Local Variables
         ISldWorks iSwApp = null;
         ICommandManager iCmdMgr = null;
-        ModelDoc2 swModelDoc;
-        ModelDocExtension swModelDocExt;
+        public ModelDoc2 swModelDoc;
+        public ModelDocExtension swModelDocExt;
         FeatureManager swFeatureManager = default(FeatureManager);
         int addinID = 0;
         BitmapHandler iBmp;
         int registerID;
         bool boolstatus;
+        public airfoil CurrentAirfoil;
+        public OpenFileDialog browser = new OpenFileDialog();
 
         public const int mainCmdGroupID = 5;
         public const int mainItemID1 = 0;
@@ -50,7 +54,7 @@ namespace Wingit
         #endregion
 
         #region Property Manager Variables
-        public InsertAifoilPMP ppage = null;
+        public InsertAirfoilPMP AirfoilPMP = null;
         #endregion
 
 
@@ -211,7 +215,7 @@ namespace Wingit
             string Title = "WingIt", ToolTip = "WingIt Add-In";
 
 
-            int[] docTypes = new int[]{(int)swDocumentTypes_e.swDocPART};
+            int[] docTypes = new int[] { (int)swDocumentTypes_e.swDocPART };
 
             thisAssembly = System.Reflection.Assembly.GetAssembly(this.GetType());
 
@@ -254,8 +258,7 @@ namespace Wingit
             cmdGroup.IconList = icons;
 
             int menuToolbarOption = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
-            cmdIndex0 = cmdGroup.AddCommandItem2("CreateCube", 1, "Create a cube", "Create cube", 2, "GenerateAirfoil(9999)", "", mainItemID1, menuToolbarOption);
-            cmdIndex1 = cmdGroup.AddCommandItem2("Show PMP", 0, "Display sample property manager", "Show PMP", 2, "ShowPMP", "EnablePMP", mainItemID2, menuToolbarOption);
+            cmdIndex0 = cmdGroup.AddCommandItem2("Insert Airfoil", 1, "Insert an Airfoil into the Current Sketch", "Insert Airfoil", 2, "ShowAirfoilPMP", "EnablePMP", mainItemID1, menuToolbarOption);
 
             cmdGroup.HasToolbar = true;
             cmdGroup.HasMenu = true;
@@ -289,21 +292,17 @@ namespace Wingit
                 //if cmdTab is null, must be first load (possibly after reset), add the commands to the tabs
                 if (cmdTab == null)
                 {
-                    
+
                     cmdTab = iCmdMgr.AddCommandTab(type, Title);
 
                     CommandTabBox cmdBox = cmdTab.AddCommandTabBox();
 
-                    int[] cmdIDs = new int[2];
-                    int[] TextType = new int[2];
-                    
+                    int[] cmdIDs = new int[1];
+                    int[] TextType = new int[1];
+
                     cmdIDs[0] = cmdGroup.get_CommandID(cmdIndex0);
 
                     TextType[0] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
-
-                    cmdIDs[1] = cmdGroup.get_CommandID(cmdIndex1);
-
-                    TextType[1] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
 
                     bResult = cmdBox.AddCommands(cmdIDs, TextType);
                 }
@@ -348,28 +347,151 @@ namespace Wingit
 
         public Boolean AddPMP()
         {
-            ppage = new InsertAifoilPMP(this);
+            AirfoilPMP = new InsertAirfoilPMP(this);
             return true;
         }
 
         public Boolean RemovePMP()
         {
-            ppage = null;
+            AirfoilPMP = null;
             return true;
         }
 
         #endregion
 
         #region UI Callbacks
-        public void GenerateAirfoil(int NACA)
+        public airfoil GenerateAirfoil(airfoil NewAirfoil)
         {
             //Document Setup
             swModelDoc = (ModelDoc2)SwApp.ActiveDoc;
             SketchManager swSketchMgr = swModelDoc.SketchManager;
             swModelDocExt = swModelDoc.Extension;
             swFeatureManager = (FeatureManager)swModelDoc.FeatureManager;
+            airfoil currentairfoil = NewAirfoil;
+            double chord = NewAirfoil.chord;
+            int err = 0;
+            int Resolution = 100;
+            double[] x = new double[2 * Resolution + 1];
+            double[] y = new double[2 * Resolution + 1];
+            double[] z = new double[2 * Resolution + 1];
 
-            //Constant/Variable Definitions
+            if (NewAirfoil.NACA.Length==4)
+            {
+                (x, y, z) = NACA4(NewAirfoil);
+            }
+            else if(NewAirfoil.NACA.Length==5)
+            {
+                (x, y, z) = NACA5(NewAirfoil);
+            }
+
+            //Draw Airfoil
+            double[] pointdata = new double[x.Length * 3];
+            for (int i = 0; i < x.Length; i++)
+            {
+                pointdata[3 * i] = x[i] * chord;
+                pointdata[3 * i + 1] = y[i] * chord;
+                pointdata[3 * i + 2] = 0;
+            }
+            SketchSegment Airfoil;
+            object statuses = null;
+            Airfoil = (SketchSegment)swSketchMgr.CreateSpline3(pointdata, null, null, false, out statuses);
+            swSketchMgr.CreateLine(x[0] * chord, y[0] * chord, 0, x[x.Length - 1] * chord, y[y.Length - 1] * chord, 0);
+            Airfoil.Select4(true, null);
+            currentairfoil.Selection = swModelDocExt.SaveSelection(out err);
+            return currentairfoil;
+        }
+
+        public (double[] x, double[] y, double[] z) NACA4(airfoil NewAirfoil)
+        {
+            int Resolution = 100;
+            double[] x = new double[2 * Resolution + 1];
+            double[] y = new double[2 * Resolution + 1];
+            double[] z = new double[2 * Resolution + 1];
+
+            double[] camber = new double[Resolution + 1];
+            double[] thickness = new double[Resolution + 1];
+
+            double chord = NewAirfoil.chord;
+
+            double a0 = 1.4845;
+            double a1 = 0.6300;
+            double a2 = 1.7580;
+            double a3 = 1.4215;
+            double a4 = 0.5075;
+
+            int NACA = Int32.Parse(NewAirfoil.NACA);
+
+            //Parse 4 Digit NACA Number
+            double M = ((double)(NACA / 1000)) / 100; // Maximum value of camber line in hundreths of chord
+            int rem = NACA % 1000;
+            double P = ((double)(rem / 100)) / 10; // chordwise position of the maximum camber in tenths of the chord
+            double XX = ((double)(NACA % 100)) / 100; // Maxium thickness in percent chord
+
+            // Generate Chordwise Thickness and Camber Values
+            for (int i = 0; i <= Resolution; i++)
+            {
+                x[i] = 1 - ((double)i / Resolution);
+                thickness[i] = (XX) * (a0 * Math.Pow(x[i], 0.5) - a1 * x[i] - a2 * Math.Pow(x[i], 2) + a3 * Math.Pow(x[i], 3) - a4 * Math.Pow(x[i], 4));
+                if (x[i] < P)
+                {
+                    camber[i] = (M / Math.Pow(P, 2)) * (2 * P * x[i] - Math.Pow(x[i], 2));
+                }
+                else
+                {
+                    camber[i] = (M / Math.Pow(1 - P, 2)) * (1 - 2 * P + 2 * P * x[i] - Math.Pow(x[i], 2));
+                }
+            }
+
+            //Generate Airfoil Point Coordinates
+            for (int i = 0; i <= Resolution; i++)
+            {
+                x[i] = 1 - ((double)i / Resolution);
+                y[i] = camber[i] + thickness[i];
+                z[i] = 0;
+            }
+            for (int i = Resolution; i >= 0; i--)
+            {
+                x[i + Resolution] = (double)i / Resolution;
+                y[i + Resolution] = camber[Resolution - i] - thickness[Resolution - i];
+                z[i] = 0;
+            }
+
+            //Mirror Airfoil
+            if (NewAirfoil.mirror)
+            {
+                for (int i = 0; i < x.Length; i++)
+                {
+                    x[i] = x[i] * -1;
+                }
+            }
+
+            //Twist Airfoil
+            double xtwist = NewAirfoil.twistloc / 100;
+            double ytwist = 0;
+            if (xtwist < P)
+            {
+                ytwist = (M / Math.Pow(P, 2)) * (2 * P * xtwist - Math.Pow(xtwist, 2));
+            }
+            else
+            {
+                ytwist = (M / Math.Pow(1 - P, 2)) * (1 - 2 * P + 2 * P * xtwist - Math.Pow(xtwist, 2));
+            }
+            for (int i = 0; i < x.Length; i++)
+            {
+                if (NewAirfoil.mirror)
+                {
+                    (x[i], y[i]) = TwistPoint(-xtwist, ytwist, x[i], y[i], -NewAirfoil.twist);
+                }
+                else
+                {
+                    (x[i], y[i]) = TwistPoint(xtwist, ytwist, x[i], y[i], NewAirfoil.twist);
+                }
+            }
+            return (x, y, z);
+        }
+
+        public (double[] x, double[] y, double[] z) NACA5(airfoil NewAirfoil)
+        {
             int Resolution = 100;
             double[] x = new double[2 * Resolution + 1];
             double[] y = new double[2 * Resolution + 1];
@@ -384,79 +506,173 @@ namespace Wingit
             double a3 = 1.4215;
             double a4 = 0.5075;
 
-            //Parse 4 Digit NACA Number
-            double M = ((double)(NACA / 1000)) / 100; // Maximum value of camber line in hundreths of chord
-            int rem = NACA % 1000;
-            double P = ((double)(rem / 100)) / 10; // chordwise position of the maximum camber in tenths of the chord
-            double XX = ((double)(NACA % 100)) / 100; // Maxium thickness in percent chord
+            double chord = NewAirfoil.chord;
 
-            // Generate Chordwise Thickness and Camber Values
+            //r Dictionary
+            Dictionary<int, double> rdictionary = new Dictionary<int, double>();
+            rdictionary.Add(10, 0.0580);
+            rdictionary.Add(20, 0.1260);
+            rdictionary.Add(30, 0.2025);
+            rdictionary.Add(40, 0.2900);
+            rdictionary.Add(50, 0.3910);
+            rdictionary.Add(21, 0.1300);
+            rdictionary.Add(31, 0.2170);
+            rdictionary.Add(41, 0.3180);
+            rdictionary.Add(51, 0.4410);
+
+            //k1 Dictionary
+            Dictionary<int, double> k1dictionary = new Dictionary<int, double>();
+            k1dictionary.Add(10, 361.400);
+            k1dictionary.Add(20, 51.640);
+            k1dictionary.Add(30, 15.957);
+            k1dictionary.Add(40, 6.643);
+            k1dictionary.Add(50, 3.230);
+            k1dictionary.Add(21, 51.990);
+            k1dictionary.Add(31, 15.793);
+            k1dictionary.Add(41, 6.520);
+            k1dictionary.Add(51, 3.191);
+
+            //k1/k2 Dictionary
+            Dictionary<int, double> k1k2dictionary = new Dictionary<int, double>();
+            k1k2dictionary.Add(21, 0.000764);
+            k1k2dictionary.Add(31, 0.00677);
+            k1k2dictionary.Add(41, 0.0303);
+            k1k2dictionary.Add(51, 0.1355);
+
+            int NACA = Int32.Parse(NewAirfoil.NACA);
+
+            //Parse 5 Digit NACA Number
+            int L = NACA / 10000;
+            int P = (NACA / 1000) % 10;
+            int Q = (NACA / 100) % 10;
+            double XX = ((double)(NACA % 100)) / 100;
+
+            //Choose r and k1 values
+            int digits = 10 * P + Q;
+            double r=0;
+            double k1=0;
+            double k1k2=0;
+            if (Q==0)
+            {
+                r = rdictionary[digits];
+                k1 = k1dictionary[digits];
+            }
+            else if (Q==1)
+            {
+                r = rdictionary[digits];
+                k1 = k1dictionary[digits];
+                k1k2 = k1k2dictionary[digits];
+            }
+
+            //Generate Thickness and Camber
             for (int i = 0; i <= Resolution; i++)
             {
                 x[i] = 1 - ((double)i / Resolution);
-                thickness[i] = (XX) * (a0 * Math.Pow(x[i], 0.5) - a1 * x[i] - a2 * Math.Pow(x[i],2) + a3 * Math.Pow(x[i],3) - a4 * Math.Pow(x[i],4));
-                if (x[i]<P)
+                thickness[i] = (XX) * (a0 * Math.Pow(x[i], 0.5) - a1 * x[i] - a2 * Math.Pow(x[i], 2) + a3 * Math.Pow(x[i], 3) - a4 * Math.Pow(x[i], 4));
+                if (x[i]<r)
                 {
-                    camber[i] = (M / Math.Pow(P, 2)) * (2 * P * x[i] - Math.Pow(x[i], 2));
+                    if(Q==0)
+                    {
+                        camber[i] = (k1 / 6) * (Math.Pow(x[i], 3) - 3 * r * Math.Pow(x[i], 2) + Math.Pow(r, 2) * (3 - r) * x[i]);
+                    }
+                    else if(Q==1)
+                    {
+                        camber[i] = (k1 / 6) * (Math.Pow((x[i] - r), 3) - k1k2 * Math.Pow((1 - r), 3) * x[i] - Math.Pow(r, 3) * x[i] + Math.Pow(r, 3));
+                    }
                 }
-                else
+                else if (x[i]>=r)
                 {
-                    camber[i] = (M / Math.Pow(1 - P, 2)) * (1 - 2 * P + 2 * P * x[i] - Math.Pow(x[i], 2));
+                    if (Q == 0)
+                    {
+                        camber[i] = (k1 / 6) * Math.Pow(r, 3) * (1 - x[i]);
+                    }
+                    else if (Q == 1)
+                    {
+                        camber[i] = (k1 / 6) * (k1k2 * Math.Pow((x[i] - r), 3) - k1k2 * Math.Pow((1 - r), 3) * x[i] - Math.Pow(r, 3) * x[i] + Math.Pow(r, 3));
+                    }
                 }
             }
 
             //Generate Airfoil Point Coordinates
-            for (int i = 0; i<= Resolution; i++)
+            for (int i = 0; i <= Resolution; i++)
             {
                 x[i] = 1 - ((double)i / Resolution);
                 y[i] = camber[i] + thickness[i];
                 z[i] = 0;
             }
-            for(int i = Resolution; i>=0; i--)
+            for (int i = Resolution; i >= 0; i--)
             {
                 x[i + Resolution] = (double)i / Resolution;
                 y[i + Resolution] = camber[Resolution - i] - thickness[Resolution - i];
                 z[i] = 0;
             }
-            //Scale Coordinates
-            /*
-            for(int i = 0;i<=x.Length-1;i++)
-            {
-                x[i] = x[i] * chord;
-                y[i] = y[i] * chord;
-                z[i] = 0;
-            }
-            */
 
-            //Create Spline
-            boolstatus = swModelDocExt.SelectByID2("Right Plane", "PLANE", 0, 0, 0, false, 0, null, 0);
-            swModelDoc.InsertSketch2(true);
-            for (int i = 0; i<=x.Length-1; i++)
+            //Mirror Airfoil
+            if (NewAirfoil.mirror)
             {
-                swModelDoc.SketchSpline(x.Length-i-1, x[i], y[i], 0);
-            }
-            swSketchMgr.CreateLine(x[0], y[0], 0, x[x.Length - 1], y[y.Length - 1], 0);
-            swModelDoc.InsertSketch2(true);
-            /*
-            RefPlane swRefPlane = default(RefPlane);
-            boolstatus = swModelDocExt.SelectByID2("Right Plane", "PLANE", 0, 0, 0, false, 0, null, 0);
-            swRefPlane = (RefPlane)swFeatureManager.InsertRefPlane(8, 0.1, 0, 0, 0, 0);
-    
-            double[] PlaneTransform = (double[])swRefPlane.Transform.ArrayData;
-            boolstatus = swModelDocExt.SelectByID2("", "PLANE", PlaneTransform[9], PlaneTransform[10], PlaneTransform[11], false, 0, null, 0);
-            swModelDoc.SelectedFeatureProperties(0, 0, 0, 0, 0, 0, 0, false, false, "CPX");
-            if (boolstatus)
-            {
-                swModelDoc.InsertSketch2(true);
-                for (int i = 0; i <= x.Length - 1; i++)
+                for (int i = 0; i < x.Length; i++)
                 {
-                    swModelDoc.SketchSpline(x.Length - i - 1, x[i], y[i], 0);
+                    x[i] = x[i] * -1;
                 }
-                swSketchMgr.CreateLine(x[0], y[0], 0, x[x.Length - 1], y[y.Length - 1], 0);
-                swModelDoc.InsertSketch2(true);
             }
-            */
 
+            //Twist Airfoil
+            double xtwist = NewAirfoil.twistloc / 100;
+            double ytwist = 0;
+            if (xtwist < r)
+            {
+                if (Q == 0)
+                {
+                    ytwist = (k1 / 6) * (xtwist * xtwist * xtwist - 3 * r * xtwist * xtwist + r * r * (3 - r) * xtwist);
+                }
+                else if (Q == 1)
+                {
+                    ytwist = (k1 / 6) * ((xtwist - r) * (xtwist - r) * (xtwist - r) - k1k2 * (1 - r) * (1 - r) * (1 - r) * xtwist - r * r * r * xtwist + r * r * r);
+                }
+            }
+            else if (xtwist >= r)
+            {
+                if (Q == 0)
+                {
+                    ytwist = (k1 / 6) * r * r * r * (1 - xtwist);
+                }
+                else if (Q == 1)
+                {
+                    ytwist = (k1 / 6) * (k1k2 * (xtwist - r) * (xtwist - r) * (xtwist - r) - k1k2 * (1 - r) * (1 - r) * (1 - r) * xtwist - r * r * r * xtwist + r * r * r);
+                }
+            }
+            for (int i = 0; i < x.Length; i++)
+            {
+                if (NewAirfoil.mirror)
+                {
+                    (x[i], y[i]) = TwistPoint(-xtwist, ytwist, x[i], y[i], -NewAirfoil.twist);
+                }
+                else
+                {
+                    (x[i], y[i]) = TwistPoint(xtwist, ytwist, x[i], y[i], NewAirfoil.twist);
+                }
+            }
+
+            return (x, y, z);
+        }
+
+        public (double x, double y) TwistPoint(double xorigin, double yorigin, double x, double y, double angle)
+        {
+            double xcoord = x - xorigin;
+            double ycoord = y - yorigin;
+            double magnitude = Math.Sqrt(xcoord * xcoord + ycoord * ycoord);
+            double currentangle = Math.Atan2(ycoord, xcoord);
+            double newangle = currentangle - angle;
+            y = Math.Sin(newangle) * magnitude + yorigin;
+            x = Math.Cos(newangle) * magnitude + xorigin;
+            return (x, y);
+        }
+
+        public void RemoveAirfoil(airfoil Airfoil)
+        {
+            swModelDoc = (ModelDoc2)SwApp.ActiveDoc;
+            swModelDocExt = swModelDoc.Extension;
+            swModelDocExt.DeleteSelection2((int)swDeleteSelectionOptions_e.swDelete_Absorbed);
         }
 
         public void PopupCallbackFunction()
@@ -487,10 +703,14 @@ namespace Wingit
                 return 1;
         }
 
-        public void ShowPMP()
+        public void ShowAirfoilPMP()
         {
-            if (ppage != null)
-                ppage.Show();
+            if (AirfoilPMP != null)
+            {
+                airfoil NACA0012 = new airfoil(null, "0012", 1, 0, 0, false);
+                AirfoilPMP.Show(NACA0012);
+                CurrentAirfoil = GenerateAirfoil(NACA0012);
+            }
         }
 
         public int EnablePMP()

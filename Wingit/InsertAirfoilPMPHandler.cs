@@ -2,6 +2,7 @@ using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using SolidWorks.Interop.swpublished;
 using System;
+using WingIt;
 
 namespace Wingit
 {
@@ -9,9 +10,19 @@ namespace Wingit
     {
         ISldWorks iSwApp;
         SwAddin userAddin;
-        InsertAifoilPMP ppage;
+        InsertAirfoilPMP ppage;
 
-        public InsertAirfoilPMPHandler(SwAddin addin, InsertAifoilPMP page)
+        public const int NACABoxLabelID = 0;
+        public const int NACABoxID = 1;
+        public const int ChordLabelID = 2;
+        public const int ChordBoxID = 3;
+        public const int TwistLabelID = 4;
+        public const int TwistBoxID = 5;
+        public const int TwistLocLabelID = 6;
+        public const int TwistLocBoxID = 7;
+        public const int MirrorCheckID = 8;
+
+        public InsertAirfoilPMPHandler(SwAddin addin, InsertAirfoilPMP page)
         {
             userAddin = addin;
             iSwApp = (ISldWorks)userAddin.SwApp;
@@ -30,16 +41,24 @@ namespace Wingit
 
         public void OnCheckboxCheck(int id, bool status)
         {
-
+            airfoil oldairfoil = userAddin.CurrentAirfoil;
+            airfoil newairfoil = null;
+            if (id==MirrorCheckID)
+            {
+                newairfoil = new airfoil(null, oldairfoil.NACA, oldairfoil.chord, oldairfoil.twist, oldairfoil.twistloc, status);
+                userAddin.CurrentAirfoil = newairfoil;
+                userAddin.RemoveAirfoil(oldairfoil);
+                userAddin.AirfoilPMP.Show(newairfoil);
+                userAddin.GenerateAirfoil(newairfoil);
+            }
         }
 
         public void OnClose(int reason)
         {
-            //This function must contain code, even if it does nothing, to prevent the
-            //.NET runtime environment from doing garbage collection at the wrong time.
-            int IndentSize;
-            IndentSize = System.Diagnostics.Debug.IndentSize;
-            System.Diagnostics.Debug.WriteLine(IndentSize);
+            if(reason != (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay)
+            {
+                userAddin.swModelDocExt.DeleteSelection2((int)swDeleteSelectionOptions_e.swDelete_Absorbed);
+            }
         }
 
         public void OnComboboxEditChanged(int id, string text)
@@ -54,20 +73,7 @@ namespace Wingit
 
         public void OnButtonPress(int id)
         {
-            if (id == InsertAifoilPMP.buttonID1)        // Toggle the textbox control visibility state
-            {
-                if (((IPropertyManagerPageControl)ppage.textbox2).Visible == true)
-                    ((IPropertyManagerPageControl)ppage.textbox2).Visible = false;
-                else
-                    ((IPropertyManagerPageControl)ppage.textbox2).Visible = true;
-            }
-            else if (id == InsertAifoilPMP.buttonID2)   // Toggle the textbox control enabled/disabled
-            {
-                if (((IPropertyManagerPageControl)ppage.textbox3).Enabled == true)
-                    ((IPropertyManagerPageControl)ppage.textbox3).Enabled = false;
-                else
-                    ((IPropertyManagerPageControl)ppage.textbox3).Enabled = true;
-            }
+            
         }
 
         public void OnComboboxSelectionChanged(int id, int item)
@@ -91,7 +97,7 @@ namespace Wingit
             System.Windows.Forms.Form helpForm = new System.Windows.Forms.Form();
 
             // Specify a url path or a path to a chm file
-            helppath = "http://help.solidworks.com/2016/English/api/sldworksapiprogguide/Welcome.htm";
+            helppath = "https://github.com/brheinfelder/Wingit";
             //helppath = "C:\\Program Files\\SolidWorks Corp\\SOLIDWORKS (2)\\api\\apihelp.chm";
 
             System.Windows.Forms.Help.ShowHelp(helpForm, helppath);
@@ -111,7 +117,24 @@ namespace Wingit
 
         public void OnNumberboxChanged(int id, double val)
         {
-
+            airfoil oldairfoil = userAddin.CurrentAirfoil;
+            airfoil newairfoil = null;
+            if (id==ChordBoxID)
+            {
+                newairfoil = new airfoil(null, oldairfoil.NACA, val, oldairfoil.twist, oldairfoil.twistloc, oldairfoil.mirror);
+            }
+            else if(id == TwistBoxID)
+            {
+                newairfoil = new airfoil(null, oldairfoil.NACA, oldairfoil.chord, val, oldairfoil.twistloc, oldairfoil.mirror);
+            }
+            else if(id == TwistLocBoxID)
+            {
+                newairfoil = new airfoil(null, oldairfoil.NACA, oldairfoil.chord, oldairfoil.twist, val, oldairfoil.mirror);
+            }
+            userAddin.CurrentAirfoil = newairfoil;
+            userAddin.RemoveAirfoil(oldairfoil);
+            userAddin.AirfoilPMP.Show(newairfoil);
+            userAddin.GenerateAirfoil(newairfoil);
         }
 
         public void OnNumberBoxTrackingCompleted(int id, double val)
@@ -152,7 +175,16 @@ namespace Wingit
 
         public void OnTextboxChanged(int id, string text)
         {
-
+            airfoil oldairfoil = userAddin.CurrentAirfoil;
+            airfoil newairfoil = null;
+            if(id== NACABoxID)
+            {
+                newairfoil = new airfoil(null, text, oldairfoil.chord, oldairfoil.twist, oldairfoil.twistloc, oldairfoil.mirror);
+                userAddin.CurrentAirfoil = newairfoil;
+                userAddin.RemoveAirfoil(oldairfoil);
+                userAddin.AirfoilPMP.Show(newairfoil);
+                userAddin.GenerateAirfoil(newairfoil);
+            }
         }
 
         public void AfterActivation()
