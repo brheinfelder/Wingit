@@ -11,6 +11,8 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using WingIt;
+using System.IO;
+using System.Linq;
 
 
 namespace Wingit
@@ -211,7 +213,7 @@ namespace Wingit
             if (iBmp == null)
                 iBmp = new BitmapHandler();
             Assembly thisAssembly;
-            int cmdIndex0, cmdIndex1;
+            int cmdIndex0;
             string Title = "WingIt", ToolTip = "WingIt Add-In";
 
 
@@ -247,35 +249,24 @@ namespace Wingit
             icons[4] = iBmp.CreateFileFromResourceBitmap("Wingit.toolbar96x.png", thisAssembly);
             icons[5] = iBmp.CreateFileFromResourceBitmap("Wingit.toolbar128x.png", thisAssembly);
 
-            mainIcons[0] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_20.png", thisAssembly);
-            mainIcons[1] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_32.png", thisAssembly);
-            mainIcons[2] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_40.png", thisAssembly);
-            mainIcons[3] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_64.png", thisAssembly);
-            mainIcons[4] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_96.png", thisAssembly);
-            mainIcons[5] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon_128.png", thisAssembly);
+            mainIcons[0] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon20x.png", thisAssembly);
+            mainIcons[1] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon32x.png", thisAssembly);
+            mainIcons[2] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon40x.png", thisAssembly);
+            mainIcons[3] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon64x.png", thisAssembly);
+            mainIcons[4] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon96x.png", thisAssembly);
+            mainIcons[5] = iBmp.CreateFileFromResourceBitmap("Wingit.mainicon128x.png", thisAssembly);
 
             cmdGroup.MainIconList = mainIcons;
             cmdGroup.IconList = icons;
 
             int menuToolbarOption = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
-            cmdIndex0 = cmdGroup.AddCommandItem2("Insert Airfoil", 1, "Insert an Airfoil into the Current Sketch", "Insert Airfoil", 2, "ShowAirfoilPMP", "EnablePMP", mainItemID1, menuToolbarOption);
+            cmdIndex0 = cmdGroup.AddCommandItem2("Insert Airfoil", 1, "Insert an Airfoil into the Current Sketch", "Insert Airfoil", 0, "ShowAirfoilPMP", "EnablePMP", mainItemID1, menuToolbarOption);
 
             cmdGroup.HasToolbar = true;
             cmdGroup.HasMenu = true;
             cmdGroup.Activate();
 
             bool bResult;
-
-
-
-            FlyoutGroup flyGroup = iCmdMgr.CreateFlyoutGroup2(flyoutGroupID, "Dynamic Flyout", "Flyout Tooltip", "Flyout Hint",
-              cmdGroup.MainIconList, cmdGroup.IconList, "FlyoutCallback", "FlyoutEnable");
-
-
-            flyGroup.AddCommandItem("FlyoutCommand 1", "test", 0, "FlyoutCommandItem1", "FlyoutEnableCommandItem1");
-
-            flyGroup.FlyoutType = (int)swCommandFlyoutStyle_e.swCommandFlyoutStyle_Simple;
-
 
             foreach (int type in docTypes)
             {
@@ -375,13 +366,21 @@ namespace Wingit
             double[] y = new double[2 * Resolution + 1];
             double[] z = new double[2 * Resolution + 1];
 
-            if (NewAirfoil.NACA.Length==4)
+            if(NewAirfoil.airfoiltype==airfoil.AirfoilType.NACA)
             {
-                (x, y, z) = NACA4(NewAirfoil);
+                if (NewAirfoil.NACA.Length == 4)
+                {
+                    (x, y, z) = NACA4(NewAirfoil);
+                }
+                else if (NewAirfoil.NACA.Length == 5)
+                {
+                    (x, y, z) = NACA5(NewAirfoil);
+                }
+
             }
-            else if(NewAirfoil.NACA.Length==5)
+            else
             {
-                (x, y, z) = NACA5(NewAirfoil);
+
             }
 
             //Draw Airfoil
@@ -656,6 +655,93 @@ namespace Wingit
             return (x, y, z);
         }
 
+        public (double[] x, double[] y, double[] z) CustomAirfoil(airfoil NewAirfoil)
+        {
+            double[] x;
+            double[] y;
+            double[] z;
+
+            int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
+            StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
+            rdr.ReadLine();
+            double[] numbers;
+            string identifier = rdr.ReadLine();
+            numbers = ParseLine(identifier);
+            if (numbers[0]>1)
+            {
+                (x, y, z)  = LednicerAirfoil(NewAirfoil);
+            }
+            else
+            {
+                (x, y, z)  = SeligAirfoil(NewAirfoil);
+            }
+            return (x, y, z);
+        }
+
+        public double[] ParseLine(string line)
+        {
+            double[] numbers = null;
+            string[] strings = line.Split(' ');
+            int i = 0;
+            foreach(string s in strings)
+            {
+                if (!String.IsNullOrEmpty(s))
+                {
+                    numbers[i] = Convert.ToDouble(s);
+                    i++;
+                }
+            }
+            return numbers;
+        }
+
+        public (double[] x, double[] y, double[] z) SeligAirfoil(airfoil NewAirfoil)
+        {
+            int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
+            StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
+            rdr.ReadLine();
+            int points = filelength - 1;
+            double[] coords;
+            double[] x = new double[points - 1];
+            double[] y = new double[points - 1];
+            double[] z = new double[points - 1];
+            for(int i = 0; i<filelength; i++)
+            {
+                coords = ParseLine(rdr.ReadLine());
+                x[i] = coords[0];
+                y[i] = coords[1];
+                z[i] = 0;
+            }
+            return (x, y, z);
+        }
+
+        public (double[] x, double[] y, double[] z) LednicerAirfoil(airfoil NewAirfoil)
+        {
+            int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
+            StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
+            rdr.ReadLine(); rdr.ReadLine(); rdr.ReadLine();
+            int points = (filelength - 4)/2;
+            double[] coords;
+            double[] x = new double[points - 1];
+            double[] y = new double[points - 1];
+            double[] z = new double[points - 1];
+            for(int i = 0; i<points; i++)
+            {
+                coords = ParseLine(rdr.ReadLine());
+                x[points - i] = coords[0];
+                y[points - i] = coords[1];
+                z[points - i] = 0;
+            }
+            rdr.ReadLine();
+            for (int i = points; i < 2*points-1; i++)
+            {
+                coords = ParseLine(rdr.ReadLine());
+                x[i] = coords[0];
+                y[i] = coords[1];
+                z[i] = 0;
+            }
+            return (x, y, z);
+        }
+
         public (double x, double y) TwistPoint(double xorigin, double yorigin, double x, double y, double angle)
         {
             double xcoord = x - xorigin;
@@ -707,7 +793,7 @@ namespace Wingit
         {
             if (AirfoilPMP != null)
             {
-                airfoil NACA0012 = new airfoil(null, "0012", 1, 0, 0, false);
+                airfoil NACA0012 = new airfoil(airfoil.AirfoilType.NACA, null, "0012", "", 1, 0, 0, false);
                 AirfoilPMP.Show(NACA0012);
                 CurrentAirfoil = GenerateAirfoil(NACA0012);
             }

@@ -19,29 +19,40 @@ namespace Wingit
         #region Property Manager Page Controls
 
         //Groups
-        IPropertyManagerPageGroup group1;
+        IPropertyManagerPageGroup AirfoilType;
+        IPropertyManagerPageGroup OptionsPage;
 
         //Controls
-        IPropertyManagerPageLabel NACABoxLabel;
-        IPropertyManagerPageTextbox NACABox;
-        IPropertyManagerPageLabel ChordLabel;
-        IPropertyManagerPageNumberbox ChordBox;
-        IPropertyManagerPageLabel TwistLabel;
-        IPropertyManagerPageNumberbox TwistBox;
-        IPropertyManagerPageLabel TwistLocLabel;
-        IPropertyManagerPageNumberbox TwistLocBox;
-        IPropertyManagerPageCheckbox MirrorCheck;
+        public IPropertyManagerPageOption NACAAirfoil;
+        public IPropertyManagerPageOption CustomAirfoil;
+        public IPropertyManagerPageLabel NACABoxLabel;
+        public IPropertyManagerPageTextbox NACABox;
+        public IPropertyManagerPageLabel ChordLabel;
+        public IPropertyManagerPageNumberbox ChordBox;
+        public IPropertyManagerPageLabel TwistLabel;
+        public IPropertyManagerPageNumberbox TwistBox;
+        public IPropertyManagerPageLabel TwistLocLabel;
+        public IPropertyManagerPageNumberbox TwistLocBox;
+        public IPropertyManagerPageCheckbox MirrorCheck;
+        public IPropertyManagerPageButton ImportAirfoil;
+
+        //Group IDs
+        public const int AirfoilTypeGroupID = 20;
+        public const int OptionsPageID = 21;
 
         //Control IDs
-        public const int NACABoxLabelID = 0;
-        public const int NACABoxID = 1;
-        public const int ChordLabelID = 2;
-        public const int ChordBoxID = 3;
-        public const int TwistLabelID = 4;
-        public const int TwistBoxID = 5;
-        public const int TwistLocLabelID = 6;
-        public const int TwistLocBoxID = 7;
-        public const int MirrorCheckID = 8;
+        public const int NACAAirfoilID = 0;
+        public const int CustomAirfoilID = 1;
+        public const int NACABoxLabelID = 2;
+        public const int NACABoxID = 3;
+        public const int ChordLabelID = 4;
+        public const int ChordBoxID = 5;
+        public const int TwistLabelID = 6;
+        public const int TwistBoxID = 7;
+        public const int TwistLocLabelID = 8;
+        public const int TwistLocBoxID = 9;
+        public const int MirrorCheckID = 10;
+        public const int ImportAirfoilID = 11;
 
         #endregion
 
@@ -90,24 +101,37 @@ namespace Wingit
             short align = -1;
             int options = -1;
 
-            /*
-            //Plane Selection
-            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Selectionbox;
+            //Add Groups
+            options = (int)swAddGroupBoxOptions_e.swGroupBoxOptions_Expanded |
+                      (int)swAddGroupBoxOptions_e.swGroupBoxOptions_Visible;
+
+            AirfoilType = (IPropertyManagerPageGroup)swPropertyPage.AddGroupBox(AirfoilTypeGroupID, "Airfoil Type", options);
+            OptionsPage = (IPropertyManagerPageGroup)swPropertyPage.AddGroupBox(AirfoilTypeGroupID, "Options", options);
+
+            //NACA Airfoil Type Selector
+            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Option;
             align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_LeftEdge;
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            Selectionbox = (IPropertyManagerPageSelectionbox)swPropertyPage.AddControl(SelectionboxID, controlType, "Airfoil Plane", align, options, "Airfoil Plane");
+            NACAAirfoil = (IPropertyManagerPageOption)AirfoilType.AddControl(NACAAirfoilID, controlType, "NACA Airfoil", align, options, "NACA Airfoil");
 
-            swSelectType_e[] filters = new swSelectType_e[1];
-            filters[0] = swSelectType_e.swSelSKETCHES;
-            object filterobj = filters;
+            NACAAirfoil.Checked = true;
+            NACAAirfoil.Style = (int)swPropMgrPageOptionStyle_e.swPropMgrPageOptionStyle_FirstInGroup;
 
-            Selectionbox.SingleEntityOnly = true;
-            Selectionbox.AllowMultipleSelectOfSameEntity = false;
-            Selectionbox.Height = 20;
-            Selectionbox.SetSelectionFilters(filterobj);
-            */
+            //Custom Airfoil Type Selector
+            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Option;
+            align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_LeftEdge;
+            options = (int)swAddControlOptions_e.swControlOptions_Enabled |
+                    (int)swAddControlOptions_e.swControlOptions_Visible;
+
+            CustomAirfoil = (IPropertyManagerPageOption)AirfoilType.AddControl(CustomAirfoilID, controlType, "Custom Airfoil", align, options, "Custom Airfoil");
+
+            //Airfoil Message
+            swPropertyPage.SetMessage3("Compatible with basic 4 and 5 digit NACA airfoils.",
+                                            (int)swPropertyManagerPageMessageVisibility.swImportantMessageBox,
+                                            (int)swPropertyManagerPageMessageExpanded.swMessageBoxExpand,
+                                            "NACA Airfoil");
 
             //NACA Designation Label
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Label;
@@ -115,7 +139,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            NACABoxLabel = (IPropertyManagerPageLabel)swPropertyPage.AddControl(NACABoxLabelID, controlType, "NACA Designation", align, options, "NACA Designation");
+            NACABoxLabel = (IPropertyManagerPageLabel)AirfoilType.AddControl(NACABoxLabelID, controlType, "NACA Designation", align, options, "NACA Designation");
 
             //NACA Designation Input Box
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Textbox;
@@ -123,9 +147,19 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            NACABox = (IPropertyManagerPageTextbox)swPropertyPage.AddControl(NACABoxID, controlType, "NACA Designation", align, options, "NACA Designation");
+            NACABox = (IPropertyManagerPageTextbox)AirfoilType.AddControl(NACABoxID, controlType, "NACA Designation", align, options, "NACA Designation");
 
             NACABox.Style = (int)swPropMgrPageTextBoxStyle_e.swPropMgrPageTextBoxStyle_NotifyOnlyWhenFocusLost;
+
+            //Import Airfoil Button
+            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Button;
+            align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_Indent;
+            options = (int)swAddControlOptions_e.swControlOptions_Enabled |
+                    (int)swAddControlOptions_e.swControlOptions_Visible;
+
+            ImportAirfoil = (IPropertyManagerPageButton)AirfoilType.AddControl(ImportAirfoilID, controlType, "Import Airfoil", align, options, "Import Airfoil Data");
+
+            ((IPropertyManagerPageControl)ImportAirfoil).Visible = false;
 
             //Airfoil Chord Label
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Label;
@@ -133,7 +167,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            ChordLabel = (IPropertyManagerPageLabel)swPropertyPage.AddControl(ChordLabelID, controlType, "Airfoil Chord", align, options, "Airfoil Chord");
+            ChordLabel = (IPropertyManagerPageLabel)OptionsPage.AddControl(ChordLabelID, controlType, "Airfoil Chord", align, options, "Airfoil Chord");
 
             //Chord Box
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Numberbox;
@@ -141,7 +175,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            ChordBox = (IPropertyManagerPageNumberbox)swPropertyPage.AddControl(ChordBoxID, controlType, "Airfoil Chord", align, options, "Airfoil Chord");
+            ChordBox = (IPropertyManagerPageNumberbox)OptionsPage.AddControl(ChordBoxID, controlType, "Airfoil Chord", align, options, "Airfoil Chord");
 
             ChordBox.Style = (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_NoScrollArrows | (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_SuppressNotifyWhileTracking;
             ChordBox.SetRange2((int)swNumberboxUnitType_e.swNumberBox_Length, (double)0, Math.Pow(10, 10), true, (double)10, (double)20, (double)5);
@@ -153,7 +187,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            TwistLabel = (IPropertyManagerPageLabel)swPropertyPage.AddControl(TwistLabelID, controlType, "Airfoil Twist", align, options, "Airfoil Twist");
+            TwistLabel = (IPropertyManagerPageLabel)OptionsPage.AddControl(TwistLabelID, controlType, "Airfoil Twist", align, options, "Airfoil Twist");
 
             //Twist Box
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Numberbox;
@@ -161,7 +195,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            TwistBox = (IPropertyManagerPageNumberbox)swPropertyPage.AddControl(TwistBoxID, controlType, "Airfoil Twist Angle", align, options, "Airfoil Twist Angle");
+            TwistBox = (IPropertyManagerPageNumberbox)OptionsPage.AddControl(TwistBoxID, controlType, "Airfoil Twist Angle", align, options, "Airfoil Twist Angle");
 
             TwistBox.Style = (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_NoScrollArrows | (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_SuppressNotifyWhileTracking;
             TwistBox.SetRange2((int)swNumberboxUnitType_e.swNumberBox_Angle, (double)-180, (double)180, true, (double)10, (double)20, (double)5);
@@ -172,7 +206,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            TwistLocLabel = (IPropertyManagerPageLabel)swPropertyPage.AddControl(TwistLabelID, controlType, "Airfoil Twist Location", align, options, "Airfoil Twist Location along Camber Line as a percent of the Chord");
+            TwistLocLabel = (IPropertyManagerPageLabel)OptionsPage.AddControl(TwistLabelID, controlType, "Airfoil Twist Location", align, options, "Airfoil Twist Location along Camber Line as a percent of the Chord");
 
             //Twist Location Box
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Numberbox;
@@ -180,7 +214,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            TwistLocBox = (IPropertyManagerPageNumberbox)swPropertyPage.AddControl(TwistLocBoxID, controlType, "Airfoil Twist Location", align, options, "Airfoil Twist Location along Camber Line as a percent of the Chord");
+            TwistLocBox = (IPropertyManagerPageNumberbox)OptionsPage.AddControl(TwistLocBoxID, controlType, "Airfoil Twist Location", align, options, "Airfoil Twist Location along Camber Line as a percent of the Chord");
 
             TwistLocBox.Style = (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_NoScrollArrows | (int)swPropMgrPageNumberBoxStyle_e.swPropMgrPageNumberBoxStyle_SuppressNotifyWhileTracking;
             TwistLocBox.SetRange2((int)swNumberboxUnitType_e.swNumberBox_Percent, (double)0, (double)100, true, (double)10, (double)20, (double)5);
@@ -191,7 +225,7 @@ namespace Wingit
             options = (int)swAddControlOptions_e.swControlOptions_Enabled |
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
-            MirrorCheck = (IPropertyManagerPageCheckbox)swPropertyPage.AddControl(MirrorCheckID, controlType, "Mirror Airfoil", align, options, "Mirror Airfoil");
+            MirrorCheck = (IPropertyManagerPageCheckbox)OptionsPage.AddControl(MirrorCheckID, controlType, "Mirror Airfoil", align, options, "Mirror Airfoil");
         }
 
         public void Show(airfoil Airfoil)

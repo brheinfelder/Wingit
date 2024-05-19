@@ -137,12 +137,6 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="InsertAirfoilPMP.cs" />
-    <EmbeddedResource Include="mainicon_20.png" />
-    <EmbeddedResource Include="mainicon_32.png" />
-    <EmbeddedResource Include="mainicon_40.png" />
-    <EmbeddedResource Include="mainicon_64.png" />
-    <EmbeddedResource Include="mainicon_96.png" />
-    <EmbeddedResource Include="mainicon_128.png" />
     <EmbeddedResource Include="toolbar20x.png" />
     <EmbeddedResource Include="toolbar32x.png" />
     <EmbeddedResource Include="toolbar40x.png" />
@@ -157,6 +151,14 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="mainicon128x.png" />
+    <Content Include="mainicon20x.png" />
+    <Content Include="mainicon32x.png" />
+    <Content Include="mainicon40x.png" />
+    <Content Include="mainicon64x.png" />
+    <Content Include="mainicon96x.png" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
