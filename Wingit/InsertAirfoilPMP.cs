@@ -13,8 +13,6 @@ namespace Wingit
         InsertAirfoilPMPHandler handler = null;
         ISldWorks iSwApp = null;
         SwAddin userAddin = null;
-        IPropertyManagerPageTab ppagetab1 = null;
-        IPropertyManagerPageTab ppagetab2 = null;
 
         #region Property Manager Page Controls
 
@@ -35,6 +33,8 @@ namespace Wingit
         public IPropertyManagerPageNumberbox TwistLocBox;
         public IPropertyManagerPageCheckbox MirrorCheck;
         public IPropertyManagerPageButton ImportAirfoil;
+        public IPropertyManagerPageTextbox CustomAirfoilFileName;
+        public IPropertyManagerPageCheckbox InvertCamber;
 
         //Group IDs
         public const int AirfoilTypeGroupID = 20;
@@ -53,6 +53,8 @@ namespace Wingit
         public const int TwistLocBoxID = 9;
         public const int MirrorCheckID = 10;
         public const int ImportAirfoilID = 11;
+        public const int CustomAirfoilFileNameID = 12;
+        public const int InvertCamberID = 13;
 
         #endregion
 
@@ -74,7 +76,7 @@ namespace Wingit
         protected void CreatePropertyManagerPage()
         {
             int errors = -1;
-            int options = /*(int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton |*/
+            int options =
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_CancelButton |
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton;
 
@@ -161,6 +163,15 @@ namespace Wingit
 
             ((IPropertyManagerPageControl)ImportAirfoil).Visible = false;
 
+            //Custom Airfoil Filename Input Box
+            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Textbox;
+            align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_LeftEdge;
+            options = 0;
+
+            CustomAirfoilFileName = (IPropertyManagerPageTextbox)AirfoilType.AddControl(CustomAirfoilFileNameID, controlType, "", align, options, "Airfoil File Name");
+
+            CustomAirfoilFileName.Style = (int)swPropMgrPageTextBoxStyle_e.swPropMgrPageTextBoxStyle_ReadOnly;
+
             //Airfoil Chord Label
             controlType = (int)swPropertyManagerPageControlType_e.swControlType_Label;
             align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_LeftEdge;
@@ -226,6 +237,14 @@ namespace Wingit
                     (int)swAddControlOptions_e.swControlOptions_Visible;
 
             MirrorCheck = (IPropertyManagerPageCheckbox)OptionsPage.AddControl(MirrorCheckID, controlType, "Mirror Airfoil", align, options, "Mirror Airfoil");
+
+            //Invert Camber Checkbox
+            controlType = (int)swPropertyManagerPageControlType_e.swControlType_Checkbox;
+            align = (int)swPropertyManagerPageControlLeftAlign_e.swControlAlign_LeftEdge;
+            options = (int)swAddControlOptions_e.swControlOptions_Enabled |
+                    (int)swAddControlOptions_e.swControlOptions_Visible;
+
+            InvertCamber = (IPropertyManagerPageCheckbox)OptionsPage.AddControl(InvertCamberID, controlType, "Invert Camber", align, options, "Invert Camber");
         }
 
         public void Show(airfoil Airfoil)
@@ -237,6 +256,26 @@ namespace Wingit
                 TwistBox.Value = Airfoil.twist;
                 TwistLocBox.Value = Airfoil.twistloc;
                 MirrorCheck.Checked = Airfoil.mirror;
+                InvertCamber.Checked = Airfoil.invertcamber;
+                CustomAirfoilFileName.Text = Airfoil.airfoilfilename;
+                if (Airfoil.airfoiltype==airfoil.AirfoilType.Custom)
+                {
+                    CustomAirfoil.Checked = true;
+                    NACAAirfoil.Checked = false;
+                    ((IPropertyManagerPageControl)NACABoxLabel).Visible = false;
+                    ((IPropertyManagerPageControl)NACABox).Visible = false;
+                    ((IPropertyManagerPageControl)ImportAirfoil).Visible = true;
+                    ((IPropertyManagerPageControl)CustomAirfoilFileName).Visible = true;
+                }
+                else
+                {
+                    CustomAirfoil.Checked = false;
+                    NACAAirfoil.Checked = true;
+                    ((IPropertyManagerPageControl)NACABoxLabel).Visible = true;
+                    ((IPropertyManagerPageControl)NACABox).Visible = true;
+                    ((IPropertyManagerPageControl)ImportAirfoil).Visible = false;
+                    ((IPropertyManagerPageControl)CustomAirfoilFileName).Visible = false;
+                }
                 swPropertyPage.Show();
             }
         }

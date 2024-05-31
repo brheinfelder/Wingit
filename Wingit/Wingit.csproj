@@ -131,6 +131,8 @@
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="WingBuilderPMPHandler.cs" />
+    <Compile Include="WingBuilderPMP.cs" />
     <Compile Include="EventHandling.cs" />
     <Compile Include="InsertAirfoilPMPHandler.cs" />
     <Compile Include="SwAddin.cs">

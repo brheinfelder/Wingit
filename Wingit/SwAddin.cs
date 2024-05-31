@@ -57,6 +57,7 @@ namespace Wingit
 
         #region Property Manager Variables
         public InsertAirfoilPMP AirfoilPMP = null;
+        public WingBuilderPMP WingPMP = null;
         #endregion
 
 
@@ -179,7 +180,8 @@ namespace Wingit
             #endregion
 
             #region Setup Sample Property Manager
-            AddPMP();
+            AddAirfoilPMP();
+            AddWingPMP();
             #endregion
 
             return true;
@@ -188,7 +190,8 @@ namespace Wingit
         public bool DisconnectFromSW()
         {
             RemoveCommandMgr();
-            RemovePMP();
+            RemoveAirfoilPMP();
+            RemoveWingPMP();
             DetachEventHandlers();
 
             System.Runtime.InteropServices.Marshal.ReleaseComObject(iCmdMgr);
@@ -214,16 +217,15 @@ namespace Wingit
                 iBmp = new BitmapHandler();
             Assembly thisAssembly;
             int cmdIndex0;
+            int cmdIndex1;
             string Title = "WingIt", ToolTip = "WingIt Add-In";
-
 
             int[] docTypes = new int[] { (int)swDocumentTypes_e.swDocPART };
 
             thisAssembly = System.Reflection.Assembly.GetAssembly(this.GetType());
 
-
             int cmdGroupErr = 0;
-            bool ignorePrevious = false;
+            bool ignorePrevious = true;
 
             object registryIDs;
             //get the ID information stored in the registry
@@ -261,6 +263,7 @@ namespace Wingit
 
             int menuToolbarOption = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
             cmdIndex0 = cmdGroup.AddCommandItem2("Insert Airfoil", 1, "Insert an Airfoil into the Current Sketch", "Insert Airfoil", 0, "ShowAirfoilPMP", "EnablePMP", mainItemID1, menuToolbarOption);
+            cmdIndex1 = cmdGroup.AddCommandItem2("Wing Builder", 1, "Open Wing Builder Dialog", "Wing Builder", 1, "WingBuilderPMP", "EnablePMP", mainItemID1, menuToolbarOption);
 
             cmdGroup.HasToolbar = true;
             cmdGroup.HasMenu = true;
@@ -268,38 +271,35 @@ namespace Wingit
 
             bool bResult;
 
-            foreach (int type in docTypes)
+            int[] alldocs = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+            CommandTab cmdTab;
+            foreach (int type in alldocs)
             {
-                CommandTab cmdTab;
-
                 cmdTab = iCmdMgr.GetCommandTab(type, Title);
-
-                if (cmdTab != null & !getDataResult | ignorePrevious)//if tab exists, but we have ignored the registry info (or changed command group ID), re-create the tab.  Otherwise the ids won't matchup and the tab will be blank
+                if (cmdTab != null)
                 {
                     bool res = iCmdMgr.RemoveCommandTab(cmdTab);
                     cmdTab = null;
                 }
-
-                //if cmdTab is null, must be first load (possibly after reset), add the commands to the tabs
-                if (cmdTab == null)
-                {
-
-                    cmdTab = iCmdMgr.AddCommandTab(type, Title);
-
-                    CommandTabBox cmdBox = cmdTab.AddCommandTabBox();
-
-                    int[] cmdIDs = new int[1];
-                    int[] TextType = new int[1];
-
-                    cmdIDs[0] = cmdGroup.get_CommandID(cmdIndex0);
-
-                    TextType[0] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
-
-                    bResult = cmdBox.AddCommands(cmdIDs, TextType);
-                }
-
             }
 
+            cmdTab = iCmdMgr.AddCommandTab((int)swDocumentTypes_e.swDocPART, Title);
+
+            CommandTabBox cmdBox = cmdTab.AddCommandTabBox();
+
+            int[] cmdIDs = new int[2];
+            int[] TextType = new int[2];
+
+            cmdIDs[0] = cmdGroup.get_CommandID(cmdIndex0);
+
+            TextType[0] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
+
+            cmdIDs[1] = cmdGroup.get_CommandID(cmdIndex1);
+
+            TextType[1] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
+
+            bResult = cmdBox.AddCommands(cmdIDs, TextType);
         }
 
         public void RemoveCommandMgr()
@@ -336,15 +336,27 @@ namespace Wingit
             return true;
         }
 
-        public Boolean AddPMP()
+        public Boolean AddAirfoilPMP()
         {
             AirfoilPMP = new InsertAirfoilPMP(this);
             return true;
         }
 
-        public Boolean RemovePMP()
+        public Boolean RemoveAirfoilPMP()
         {
             AirfoilPMP = null;
+            return true;
+        }
+
+        public Boolean AddWingPMP()
+        {
+            WingPMP = new WingBuilderPMP(this);
+            return true;
+        }
+
+        public Boolean RemoveWingPMP()
+        {
+            WingPMP = null;
             return true;
         }
 
@@ -376,14 +388,34 @@ namespace Wingit
                 {
                     (x, y, z) = NACA5(NewAirfoil);
                 }
-
             }
             else
             {
-
+                int Length = 0;
+                (x, y, z, Length) = CustomAirfoil(NewAirfoil);
+                Array.Resize(ref x, Length);
+                Array.Resize(ref y, Length);
+                Array.Resize(ref z, Length);
             }
 
+            /*
+            string prntx = "";
+            string prnty = "";
+            foreach(double entry in x)
+            {
+                prntx = prntx + " " + entry;
+            }
+            foreach(double entry in y)
+            {
+                prnty = prnty + " " + entry;
+            }
+            System.Windows.Forms.MessageBox.Show(prntx);
+            System.Windows.Forms.MessageBox.Show(prnty);
+            */
+
             //Draw Airfoil
+            SketchSegment Airfoil = null;
+            object statuses = null;
             double[] pointdata = new double[x.Length * 3];
             for (int i = 0; i < x.Length; i++)
             {
@@ -391,8 +423,6 @@ namespace Wingit
                 pointdata[3 * i + 1] = y[i] * chord;
                 pointdata[3 * i + 2] = 0;
             }
-            SketchSegment Airfoil;
-            object statuses = null;
             Airfoil = (SketchSegment)swSketchMgr.CreateSpline3(pointdata, null, null, false, out statuses);
             swSketchMgr.CreateLine(x[0] * chord, y[0] * chord, 0, x[x.Length - 1] * chord, y[y.Length - 1] * chord, 0);
             Airfoil.Select4(true, null);
@@ -460,7 +490,16 @@ namespace Wingit
             {
                 for (int i = 0; i < x.Length; i++)
                 {
-                    x[i] = x[i] * -1;
+                    x[i] *= -1;
+                }
+            }
+
+            //Invert Camber
+            if (NewAirfoil.invertcamber)
+            {
+                for (int i = 0; i < y.Length; i++)
+                {
+                    y[i] *= -1;
                 }
             }
 
@@ -611,7 +650,16 @@ namespace Wingit
             {
                 for (int i = 0; i < x.Length; i++)
                 {
-                    x[i] = x[i] * -1;
+                    x[i] *= -1;
+                }
+            }
+
+            //Invert Camber
+            if (NewAirfoil.invertcamber)
+            {
+                for (int i = 0; i < y.Length; i++)
+                {
+                    y[i] *= -1;
                 }
             }
 
@@ -655,11 +703,13 @@ namespace Wingit
             return (x, y, z);
         }
 
-        public (double[] x, double[] y, double[] z) CustomAirfoil(airfoil NewAirfoil)
+        public (double[] x, double[] y, double[] z, int Length) CustomAirfoil(airfoil NewAirfoil)
         {
-            double[] x;
-            double[] y;
-            double[] z;
+            int Resolution = 100;
+            int Length = 0;
+            double[] x = new double[2 * Resolution + 1];
+            double[] y = new double[2 * Resolution + 1];
+            double[] z = new double[2 * Resolution + 1];
 
             int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
             StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
@@ -669,18 +719,104 @@ namespace Wingit
             numbers = ParseLine(identifier);
             if (numbers[0]>1)
             {
-                (x, y, z)  = LednicerAirfoil(NewAirfoil);
+                (x, y, z, Length)  = LednicerAirfoil(NewAirfoil);
             }
             else
             {
-                (x, y, z)  = SeligAirfoil(NewAirfoil);
+                (x, y, z, Length)  = SeligAirfoil(NewAirfoil);
             }
-            return (x, y, z);
+            Array.Resize(ref x, Length);
+            Array.Resize(ref y, Length);
+            Array.Resize(ref z, Length);
+
+            //Mirror Airfoil
+            if (NewAirfoil.mirror)
+            {
+                for (int i = 0; i < x.Length; i++)
+                {
+                    x[i] *= -1;
+                }
+            }
+
+            //Invert Camber
+            if (NewAirfoil.invertcamber)
+            {
+                for (int i = 0; i < y.Length; i++)
+                {
+                    y[i] *= -1;
+                }
+            }
+
+            //Calculate Twist Point (Along Mean Line)
+            double xtwist = NewAirfoil.twistloc / 100;
+            double ytwist = 0;
+            double[] Set1x = new double[2];
+            double[] Set1y = new double[2];
+            double y1 = 0;
+            double[] Set2x = new double[2];
+            double[] Set2y = new double[2];
+            double y2 = 0;
+            
+            for (int i = 0; i < ((x.Length + 1) / 2)-1; i++)
+            {
+                if (Math.Abs(x[i]) <= xtwist)
+                {
+                    if (Math.Abs(x[i]) == xtwist)
+                    {
+                        y1 = y[i];
+                    }
+                    else
+                    {
+                        Set1x[0] = Math.Abs(x[i - 1]);
+                        Set1x[1] = Math.Abs(x[i]);
+                        Set1y[0] = y[i - 1];
+                        Set1y[1] = y[i];
+                        y1 = Set1y[0] + ((xtwist - Set1x[0]) / (Set1x[1] - Set1x[0])) * (Set1y[1] - Set1y[0]);
+                    }
+                    break;
+                }
+            }
+            for (int i = ((x.Length + 1) / 2)+1; i < x.Length - 1; i++)
+            {
+                if (Math.Abs(x[i]) >= xtwist)
+                {
+                    if (Math.Abs(x[i]) == xtwist)
+                    {
+                        y2 = y[i];
+                    }
+                    else
+                    {
+                        Set2x[0] = Math.Abs(x[i - 1]);
+                        Set2x[1] = Math.Abs(x[i]);
+                        Set2y[0] = y[i - 1];
+                        Set2y[1] = y[i];
+                        y2 = Set2y[0] + ((xtwist - Set2x[0]) / (Set2x[1] - Set2x[0])) * (Set2y[1] - Set2y[0]);
+                    }
+                    break;
+                }
+            }
+
+            ytwist = (y1 + y2) / 2;
+
+            //Twist Airfoil
+            for (int i = 0; i < x.Length; i++)
+            {
+                if (NewAirfoil.mirror)
+                {
+                    (x[i], y[i]) = TwistPoint(-xtwist, ytwist, x[i], y[i], -NewAirfoil.twist);
+                }
+                else
+                {
+                    (x[i], y[i]) = TwistPoint(xtwist, ytwist, x[i], y[i], NewAirfoil.twist);
+                }
+            }
+            
+            return (x, y, z, Length);
         }
 
         public double[] ParseLine(string line)
         {
-            double[] numbers = null;
+            double[] numbers = new double[2];
             string[] strings = line.Split(' ');
             int i = 0;
             foreach(string s in strings)
@@ -688,58 +824,62 @@ namespace Wingit
                 if (!String.IsNullOrEmpty(s))
                 {
                     numbers[i] = Convert.ToDouble(s);
+                    //System.Windows.Forms.MessageBox.Show(i.ToString()+": "+numbers[i].ToString());
                     i++;
                 }
             }
             return numbers;
         }
 
-        public (double[] x, double[] y, double[] z) SeligAirfoil(airfoil NewAirfoil)
+        public (double[] x, double[] y, double[] z, int Length) SeligAirfoil(airfoil NewAirfoil)
         {
+            //System.Windows.Forms.MessageBox.Show("Selig");
             int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
+            //System.Windows.Forms.MessageBox.Show(filelength.ToString());
             StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
             rdr.ReadLine();
             int points = filelength - 1;
             double[] coords;
-            double[] x = new double[points - 1];
-            double[] y = new double[points - 1];
-            double[] z = new double[points - 1];
-            for(int i = 0; i<filelength; i++)
+            double[] x = new double[points];
+            double[] y = new double[points];
+            double[] z = new double[points];
+            for (int i = 0; i<filelength - 1; i++)
             {
                 coords = ParseLine(rdr.ReadLine());
                 x[i] = coords[0];
                 y[i] = coords[1];
                 z[i] = 0;
             }
-            return (x, y, z);
+            return (x, y, z, x.Length);
         }
 
-        public (double[] x, double[] y, double[] z) LednicerAirfoil(airfoil NewAirfoil)
+        public (double[] x, double[] y, double[] z, int Length) LednicerAirfoil(airfoil NewAirfoil)
         {
+            //System.Windows.Forms.MessageBox.Show("Lednicer");
             int filelength = File.ReadLines(NewAirfoil.airfoilpath).Count();
             StreamReader rdr = new StreamReader(NewAirfoil.airfoilpath);
-            rdr.ReadLine(); rdr.ReadLine(); rdr.ReadLine();
-            int points = (filelength - 4)/2;
-            double[] coords;
-            double[] x = new double[points - 1];
-            double[] y = new double[points - 1];
-            double[] z = new double[points - 1];
-            for(int i = 0; i<points; i++)
-            {
-                coords = ParseLine(rdr.ReadLine());
-                x[points - i] = coords[0];
-                y[points - i] = coords[1];
-                z[points - i] = 0;
-            }
             rdr.ReadLine();
-            for (int i = points; i < 2*points-1; i++)
+            double[] identifier = ParseLine(rdr.ReadLine());
+            double[] coords;
+            double[] x = new double[(int)(identifier[0] + identifier[1]) - 1];
+            double[] y = new double[(int)(identifier[0] + identifier[1]) - 1];
+            double[] z = new double[(int)(identifier[0] + identifier[1]) - 1];
+            for (int i = (int)identifier[0]; i>=0; i--)
             {
                 coords = ParseLine(rdr.ReadLine());
                 x[i] = coords[0];
                 y[i] = coords[1];
                 z[i] = 0;
             }
-            return (x, y, z);
+            rdr.ReadLine();
+            for (int i = (int)(identifier[0]-1); i < (int)(identifier[0] + identifier[1]-1); i++)
+            {
+                coords = ParseLine(rdr.ReadLine());
+                x[i] = coords[0];
+                y[i] = coords[1];
+                z[i] = 0;
+            }
+            return (x, y, z, x.Length);
         }
 
         public (double x, double y) TwistPoint(double xorigin, double yorigin, double x, double y, double angle)
@@ -758,6 +898,8 @@ namespace Wingit
         {
             swModelDoc = (ModelDoc2)SwApp.ActiveDoc;
             swModelDocExt = swModelDoc.Extension;
+            swModelDoc.ClearSelection2(true);
+            Airfoil.Selection.Select();
             swModelDocExt.DeleteSelection2((int)swDeleteSelectionOptions_e.swDelete_Absorbed);
         }
 

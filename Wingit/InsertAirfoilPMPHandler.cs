@@ -34,10 +34,18 @@ namespace Wingit
         public void OnCheckboxCheck(int id, bool status)
         {
             airfoil oldairfoil = userAddin.CurrentAirfoil;
-            airfoil newairfoil = null;
+            airfoil newairfoil = oldairfoil;
             if (id==InsertAirfoilPMP.MirrorCheckID)
             {
-                newairfoil = new airfoil(oldairfoil.airfoiltype, null, oldairfoil.NACA, oldairfoil.airfoilpath, oldairfoil.chord, oldairfoil.twist, oldairfoil.twistloc, status);
+                newairfoil.mirror = status;
+                userAddin.CurrentAirfoil = newairfoil;
+                userAddin.RemoveAirfoil(oldairfoil);
+                userAddin.AirfoilPMP.Show(newairfoil);
+                userAddin.GenerateAirfoil(newairfoil);
+            }
+            else if (id==InsertAirfoilPMP.InvertCamberID)
+            {
+                newairfoil.invertcamber = status;
                 userAddin.CurrentAirfoil = newairfoil;
                 userAddin.RemoveAirfoil(oldairfoil);
                 userAddin.AirfoilPMP.Show(newairfoil);
@@ -78,8 +86,10 @@ namespace Wingit
                 {
                     filePath = dlg.FileName;
                     airfoil oldairfoil = userAddin.CurrentAirfoil;
-                    airfoil newairfoil = null;
-                    newairfoil = new airfoil(airfoil.AirfoilType.Custom, null, oldairfoil.NACA, filePath, oldairfoil.chord, oldairfoil.twist, oldairfoil.twistloc, oldairfoil.mirror);
+                    airfoil newairfoil = oldairfoil;
+                    newairfoil.airfoiltype = airfoil.AirfoilType.Custom;
+                    newairfoil.airfoilpath = filePath;
+                    newairfoil.airfoilfilename = dlg.SafeFileName;
                     userAddin.CurrentAirfoil = newairfoil;
                     userAddin.RemoveAirfoil(oldairfoil);
                     userAddin.AirfoilPMP.Show(newairfoil);
@@ -130,18 +140,18 @@ namespace Wingit
         public void OnNumberboxChanged(int id, double val)
         {
             airfoil oldairfoil = userAddin.CurrentAirfoil;
-            airfoil newairfoil = null;
+            airfoil newairfoil = oldairfoil;
             if (id== InsertAirfoilPMP.ChordBoxID)
             {
-                newairfoil = new airfoil(oldairfoil.airfoiltype, null, oldairfoil.NACA, oldairfoil.airfoilpath, val, oldairfoil.twist, oldairfoil.twistloc, oldairfoil.mirror);
+                newairfoil.chord = val;
             }
             else if(id == InsertAirfoilPMP.TwistBoxID)
             {
-                newairfoil = new airfoil(oldairfoil.airfoiltype, null, oldairfoil.NACA, oldairfoil.airfoilpath, oldairfoil.chord, val, oldairfoil.twistloc, oldairfoil.mirror);
+                newairfoil.twist = val;
             }
             else if(id == InsertAirfoilPMP.TwistLocBoxID)
             {
-                newairfoil = new airfoil(oldairfoil.airfoiltype, null, oldairfoil.NACA, oldairfoil.airfoilpath, oldairfoil.chord, oldairfoil.twist, val, oldairfoil.mirror);
+                newairfoil.twistloc = val;
             }
             userAddin.CurrentAirfoil = newairfoil;
             userAddin.RemoveAirfoil(oldairfoil);
@@ -156,8 +166,11 @@ namespace Wingit
 
         public void OnOptionCheck(int id)
         {
-            if(id==0)
+            airfoil oldairfoil = userAddin.CurrentAirfoil;
+            airfoil newairfoil = oldairfoil;
+            if (id==0)
             {
+                newairfoil.airfoiltype = airfoil.AirfoilType.NACA;
                 ppage.swPropertyPage.SetMessage3("Compatible with basic 4 and 5 digit NACA airfoils.",
                                             (int)swPropertyManagerPageMessageVisibility.swImportantMessageBox,
                                             (int)swPropertyManagerPageMessageExpanded.swMessageBoxExpand,
@@ -165,9 +178,15 @@ namespace Wingit
                 ((IPropertyManagerPageControl)ppage.NACABoxLabel).Visible = true;
                 ((IPropertyManagerPageControl)ppage.NACABox).Visible = true;
                 ((IPropertyManagerPageControl)ppage.ImportAirfoil).Visible = false;
+                ((IPropertyManagerPageControl)ppage.CustomAirfoilFileName).Visible = false;
+                userAddin.CurrentAirfoil = newairfoil;
+                userAddin.RemoveAirfoil(oldairfoil);
+                userAddin.AirfoilPMP.Show(newairfoil);
+                userAddin.GenerateAirfoil(newairfoil);
             }
             else if(id==1)
             {
+                newairfoil.airfoiltype = airfoil.AirfoilType.Custom;
                 ppage.swPropertyPage.SetMessage3("Normalized airfoil data must be in Lednicer or Selig format.",
                                             (int)swPropertyManagerPageMessageVisibility.swImportantMessageBox,
                                             (int)swPropertyManagerPageMessageExpanded.swMessageBoxExpand,
@@ -175,6 +194,11 @@ namespace Wingit
                 ((IPropertyManagerPageControl)ppage.NACABoxLabel).Visible = false;
                 ((IPropertyManagerPageControl)ppage.NACABox).Visible = false;
                 ((IPropertyManagerPageControl)ppage.ImportAirfoil).Visible = true;
+                ((IPropertyManagerPageControl)ppage.CustomAirfoilFileName).Visible = true;
+                userAddin.CurrentAirfoil = newairfoil;
+                userAddin.RemoveAirfoil(oldairfoil);
+                userAddin.AirfoilPMP.Show(newairfoil);
+                userAddin.GenerateAirfoil(newairfoil);
             }
         }
 
@@ -207,10 +231,10 @@ namespace Wingit
         public void OnTextboxChanged(int id, string text)
         {
             airfoil oldairfoil = userAddin.CurrentAirfoil;
-            airfoil newairfoil = null;
+            airfoil newairfoil = oldairfoil;
             if(id == InsertAirfoilPMP.NACABoxID)
             {
-                newairfoil = new airfoil(oldairfoil.airfoiltype, null, text, oldairfoil.airfoilpath, oldairfoil.chord, oldairfoil.twist, oldairfoil.twistloc, oldairfoil.mirror);
+                newairfoil.NACA = text;
                 userAddin.CurrentAirfoil = newairfoil;
                 userAddin.RemoveAirfoil(oldairfoil);
                 userAddin.AirfoilPMP.Show(newairfoil);

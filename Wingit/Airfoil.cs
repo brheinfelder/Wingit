@@ -15,10 +15,12 @@ namespace WingIt
         public AirfoilType airfoiltype;
         public string NACA; // Airfoil NACA Designation
         public string airfoilpath;
+        public string airfoilfilename;
         public double chord; // Airfoil Chord
         public double twist; // Airfoil Twist
         public double twistloc; //Location of fixed twist point as %
         public bool mirror; // Mirror Airfoil?
+        public bool invertcamber;
 
         public airfoil(AirfoilType foiltype, SelectionSet SelectionSet, string NACADesignation, string filepath, double AirfoilChord, double AirfoilTwist, double AirfoilTwistLoc, bool AirfoilMirror)
         {
